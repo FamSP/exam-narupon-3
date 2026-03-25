@@ -61,35 +61,28 @@ pipeline {
             }
         }
 
-      stage('Build & Push Docker Image') {
+stage('Build & Push Docker Image') {
     steps {
         script {
-            // 🔍 debug
-            sh 'whoami'
-            sh 'docker version'
-            sh 'docker ps'
-
-            // ✅ ไม่ใช้ env
-            def imageTag = (env.BRANCH_NAME == 'main') ?
+            // 1. คำนวณค่า tag
+            def localTag = (env.BRANCH_NAME == 'main') ?
                 sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 : "dev-${env.BUILD_NUMBER}"
 
-            echo "IMAGE TAG = ${imageTag}"
+            // 2. *** สำคัญมาก ***: นำค่าไปใส่ใน env เพื่อให้ stage อื่นเรียกใช้ได้
+            env.IMAGE_TAG = localTag 
 
-            // ✅ build image
-            def image = docker.build("${DOCKER_REPO}:${imageTag}")
+            echo "IMAGE TAG SET TO = ${env.IMAGE_TAG}"
 
-            // ✅ login + push
+            // 3. build และ push โดยใช้ env.IMAGE_TAG
+            def image = docker.build("${DOCKER_REPO}:${env.IMAGE_TAG}")
+
             docker.withRegistry('', DOCKER_HUB_CREDENTIALS_ID) {
                 image.push()
-
                 if (env.BRANCH_NAME == 'main') {
                     image.push('latest')
                 }
             }
-
-            // ✅ เก็บค่าไว้ใช้ต่อ (ไม่ใช้ env)
-            IMAGE_TAG = imageTag
         }
     }
 }
